@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime    @default(now())
+  portfolios    Portfolio[]
+}
+
+model Portfolio {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  baseCurrency  String        @default("USD")
+  createdAt     DateTime      @default(now())
+  positions     Position[]
+  transactions  Transaction[]
+}
+
+// A Position is an open/aggregated holding of a symbol in a portfolio.
+// We derive quantity & cost basis from Transactions (buys/sells) via app code,
+// but also keep a materialized row for fast reads.
+model Position {
+  id            String      @id @default(cuid())
+  portfolioId   String
+  portfolio     Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  symbol        String
+  assetType     String      @default("EQUITY") // EQUITY, ETF, CRYPTO, CASH
+  quantity      Float
+  avgCost       Float       // in base currency
+  currency      String      @default("USD")
+  sector        String?
+  country       String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  @@unique([portfolioId, symbol])
+}
+
+model Transaction {
+  id            String      @id @default(cuid())
+  portfolioId   String
+  portfolio     Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  symbol        String
+  type          String      // BUY, SELL, DIVIDEND, FEE
+  quantity      Float
+  price         Float
+  fees          Float       @default(0)
+  currency      String      @default("USD")
+  executedAt    DateTime
+  note          String?
+  createdAt     DateTime    @default(now())
+}
+
+// Cached market data (daily close) to avoid hammering yahoo.
+model PriceSnapshot {
+  id        String   @id @default(cuid())
+  symbol    String
+  date      DateTime
+  close     Float
+  currency  String   @default("USD")
+  source    String   @default("yahoo")
+  @@unique([symbol, date])
+  @@index([symbol])
+}

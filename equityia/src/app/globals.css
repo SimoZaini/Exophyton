@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html, body {
+    height: 100%;
+  }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    background-image:
+      radial-gradient(1000px 600px at -10% -20%, rgba(47,144,255,0.08), transparent 60%),
+      radial-gradient(800px 500px at 110% -10%, rgba(22,199,132,0.05), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1f2632;
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a3342;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-card border border-bg-border rounded-xl shadow-card;
+  }
+  .card-pad {
+    @apply card p-5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 hover:bg-brand-500 text-white;
+  }
+  .btn-ghost {
+    @apply btn text-fg-muted hover:text-fg hover:bg-bg-hover;
+  }
+  .btn-outline {
+    @apply btn border border-bg-border hover:bg-bg-hover text-fg;
+  }
+  .input {
+    @apply w-full rounded-lg bg-bg-elevated border border-bg-border px-3 py-2 text-sm text-fg
+           placeholder:text-fg-subtle focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500;
+  }
+  .label {
+    @apply block text-xs font-medium text-fg-muted mb-1.5 uppercase tracking-wide;
+  }
+  .kpi {
+    @apply card-pad flex flex-col gap-1;
+  }
+  .kpi-label {
+    @apply text-xs text-fg-muted uppercase tracking-wider;
+  }
+  .kpi-value {
+    @apply text-2xl font-semibold tracking-tight tabular-nums;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium tabular-nums;
+  }
+  .pill-up {
+    @apply pill bg-up/15 text-up;
+  }
+  .pill-down {
+    @apply pill bg-down/15 text-down;
+  }
+  .pill-neutral {
+    @apply pill bg-bg-hover text-fg-muted;
+  }
+  .th {
+    @apply text-xs uppercase tracking-wide text-fg-muted font-medium text-left py-2.5 px-3;
+  }
+  .td {
+    @apply py-3 px-3 text-sm border-t border-bg-border;
+  }
+}
