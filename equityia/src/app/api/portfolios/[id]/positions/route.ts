@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { getQuote } from "@/lib/market";
+import { refreshProfile } from "@/lib/fundamentals";
 
 const schema = z.object({
   symbol: z.string().min(1).max(20),
@@ -64,6 +65,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       executedAt: new Date(),
     },
   });
+
+  // Fire-and-forget: fetch & cache company profile so dividend/sector/country
+  // metadata is available on first render.
+  refreshProfile(symbol).catch(() => null);
 
   return NextResponse.json(position, { status: 201 });
 }

@@ -77,15 +77,19 @@ export default async function DashboardPage() {
               </span>
             </div>
             <div className="kpi">
-              <span className="kpi-label">Cost basis</span>
-              <span className="kpi-value">{formatCurrency(summary.totalCost, summary.baseCurrency)}</span>
-              <span className="text-sm text-fg-muted">Invested capital</span>
+              <span className="kpi-label">Forward income</span>
+              <span className="kpi-value text-up">
+                {formatCurrency(summary.forwardAnnualIncome, summary.baseCurrency)}
+              </span>
+              <span className="text-sm text-fg-muted">
+                {formatPercent(summary.portfolioYield, 2)} yield · annual
+              </span>
             </div>
             <div className="kpi">
               <span className="kpi-label">Positions</span>
               <span className="kpi-value">{summary.positions.length}</span>
               <span className="text-sm text-fg-muted">
-                {summary.allocationByAsset.length} asset {summary.allocationByAsset.length === 1 ? "class" : "classes"}
+                {summary.allocationBySector.length} sectors · {summary.allocationByCountry.length} countries
               </span>
             </div>
           </div>

@@ -72,3 +72,35 @@ model PriceSnapshot {
   @@unique([symbol, date])
   @@index([symbol])
 }
+
+// Cached company / fund profile: sector, industry, country, dividends.
+model SymbolProfile {
+  symbol                 String   @id
+  name                   String?
+  currency               String?
+  exchange               String?
+  quoteType              String?
+  sector                 String?
+  industry                String?
+  country                String?
+  region                 String?
+  marketCap              Float?
+  dividendRate           Float?   // forward annual dividend per share
+  dividendYield          Float?   // 0..1
+  exDividendDate         DateTime?
+  nextDividendDate       DateTime?
+  payoutFrequency        Int?     // payments per year (1/2/4/12); inferred
+  fiveYearAvgYield       Float?   // 0..1
+  payoutRatio            Float?
+  updatedAt              DateTime @updatedAt
+}
+
+model DividendEvent {
+  id         String   @id @default(cuid())
+  symbol     String
+  date       DateTime
+  amount     Float    // dividend per share in company currency
+  currency   String   @default("USD")
+  @@unique([symbol, date])
+  @@index([symbol])
+}

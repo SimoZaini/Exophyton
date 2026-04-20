@@ -1,5 +1,7 @@
+import type { SymbolProfile } from "@prisma/client";
 import { prisma } from "./prisma";
 import { getQuotes, cachedHistorical, type Quote } from "./market";
+import { getProfiles } from "./fundamentals";
 import {
   computeRiskSummary,
   dailyReturns,
@@ -25,7 +27,16 @@ export type EnrichedPosition = {
   weight: number;
   currency: string;
   sector?: string | null;
+  industry?: string | null;
+  country?: string | null;
+  region?: string | null;
+  dividendRate?: number | null;
+  dividendYield?: number | null;
+  forwardAnnualIncome?: number;
+  marketCap?: number | null;
 };
+
+export type Breakdown = { label: string; value: number; pct: number }[];
 
 export type PortfolioSummary = {
   id: string;
@@ -37,9 +48,14 @@ export type PortfolioSummary = {
   totalPnLPct: number;
   dayChange: number;
   dayChangePct: number;
+  forwardAnnualIncome: number;
+  portfolioYield: number;
   positions: EnrichedPosition[];
-  allocationByAsset: { label: string; value: number; pct: number }[];
-  allocationBySector: { label: string; value: number; pct: number }[];
+  allocationByAsset: Breakdown;
+  allocationBySector: Breakdown;
+  allocationByIndustry: Breakdown;
+  allocationByCountry: Breakdown;
+  allocationByRegion: Breakdown;
 };
 
 export async function getEnrichedPortfolio(portfolioId: string): Promise<PortfolioSummary | null> {
@@ -50,19 +66,24 @@ export async function getEnrichedPortfolio(portfolioId: string): Promise<Portfol
   if (!portfolio) return null;
 
   const symbols = portfolio.positions.map((p) => p.symbol);
-  const quotes = symbols.length ? await getQuotes(symbols) : {};
+  const [quotes, profiles] = await Promise.all([
+    symbols.length ? getQuotes(symbols) : Promise.resolve({} as Record<string, Quote>),
+    symbols.length ? getProfiles(symbols) : Promise.resolve({} as Record<string, SymbolProfile>),
+  ]);
 
   const enriched: EnrichedPosition[] = portfolio.positions.map((p) => {
     const q: Quote | undefined = quotes[p.symbol.toUpperCase()];
+    const prof = profiles[p.symbol.toUpperCase()];
     const price = q?.price ?? p.avgCost;
     const marketValue = price * p.quantity;
     const costBasis = p.avgCost * p.quantity;
     const pnl = marketValue - costBasis;
     const pnlPct = costBasis > 0 ? pnl / costBasis : 0;
+    const dividendRate = prof?.dividendRate ?? 0;
     return {
       id: p.id,
       symbol: p.symbol,
-      name: q?.name ?? p.symbol,
+      name: prof?.name ?? q?.name ?? p.symbol,
       assetType: p.assetType,
       quantity: p.quantity,
       avgCost: p.avgCost,
@@ -75,26 +96,33 @@ export async function getEnrichedPortfolio(portfolioId: string): Promise<Portfol
       pnlPct,
       weight: 0,
       currency: p.currency,
-      sector: p.sector,
+      sector: prof?.sector ?? p.sector,
+      industry: prof?.industry,
+      country: prof?.country ?? p.country,
+      region: prof?.region,
+      dividendRate,
+      dividendYield: prof?.dividendYield,
+      forwardAnnualIncome: dividendRate * p.quantity,
+      marketCap: prof?.marketCap,
     };
   });
 
   const totalValue = enriched.reduce((a, b) => a + b.marketValue, 0);
   const totalCost = enriched.reduce((a, b) => a + b.costBasis, 0);
   const dayChange = enriched.reduce((a, b) => a + b.dayChange, 0);
+  const forwardAnnualIncome = enriched.reduce((a, b) => a + (b.forwardAnnualIncome ?? 0), 0);
   for (const e of enriched) e.weight = totalValue > 0 ? e.marketValue / totalValue : 0;
 
-  const byAsset = new Map<string, number>();
-  const bySector = new Map<string, number>();
-  for (const e of enriched) {
-    byAsset.set(e.assetType, (byAsset.get(e.assetType) ?? 0) + e.marketValue);
-    const sec = e.sector ?? "Unclassified";
-    bySector.set(sec, (bySector.get(sec) ?? 0) + e.marketValue);
-  }
-  const toAlloc = (m: Map<string, number>) =>
-    Array.from(m.entries())
+  const groupBy = (key: (p: EnrichedPosition) => string | null | undefined, fallback = "Unclassified"): Breakdown => {
+    const m = new Map<string, number>();
+    for (const e of enriched) {
+      const k = (key(e) ?? fallback) || fallback;
+      m.set(k, (m.get(k) ?? 0) + e.marketValue);
+    }
+    return Array.from(m.entries())
       .map(([label, value]) => ({ label, value, pct: totalValue > 0 ? value / totalValue : 0 }))
       .sort((a, b) => b.value - a.value);
+  };
 
   const prevValue = totalValue - dayChange;
 
@@ -108,9 +136,14 @@ export async function getEnrichedPortfolio(portfolioId: string): Promise<Portfol
     totalPnLPct: totalCost > 0 ? (totalValue - totalCost) / totalCost : 0,
     dayChange,
     dayChangePct: prevValue > 0 ? dayChange / prevValue : 0,
+    forwardAnnualIncome,
+    portfolioYield: totalValue > 0 ? forwardAnnualIncome / totalValue : 0,
     positions: enriched,
-    allocationByAsset: toAlloc(byAsset),
-    allocationBySector: toAlloc(bySector),
+    allocationByAsset: groupBy((p) => p.assetType),
+    allocationBySector: groupBy((p) => p.sector),
+    allocationByIndustry: groupBy((p) => p.industry),
+    allocationByCountry: groupBy((p) => p.country),
+    allocationByRegion: groupBy((p) => p.region, "Unclassified"),
   };
 }
 
