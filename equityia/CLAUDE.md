@@ -27,7 +27,27 @@ Auth, portfolios CRUD, positions CRUD with ticker search, live quotes,
 dashboard, perf chart vs SPY, risk metrics page (Sharpe/Sortino/VaR/CVaR/
 maxDD/β), market watchlist, seed `demo@equityia.app` / `demo1234`.
 
-### Phase 2 (current commit — dividends + diversification)
+### Phase 3 (current commit — transactions + CSV import + dividend receipts)
+- `src/lib/transactions.ts` — `applyTransaction()` (BUY/SELL update Position
+  qty + weighted avgCost), `revertTransaction()`, `parseTransactionsCsv()`
+  (simple header-based CSV: date,symbol,type,quantity,price,fees,currency,note),
+  `dividendsReceivedBetween()`
+- API routes:
+  - `POST/GET /api/portfolios/[id]/transactions`
+  - `DELETE /api/transactions/[id]` (reverts position effect)
+  - `POST /api/portfolios/[id]/transactions/import` (CSV body)
+  - `POST /api/dividends/receive` (logs DIVIDEND tx; resolves portfolio
+    automatically from position if omitted)
+- `/transactions` page — KPI cards (invested / sold / dividends logged / fees),
+  filters (type / portfolio / symbol), add modal, CSV import modal with
+  success/failure report, delete per row
+- Dividends page: **Received YTD** KPI + per-symbol "Log" button opens modal
+  that pre-fills one expected payment (`forwardAnnualIncome / frequency`)
+- Sidebar: Transactions nav entry added (between Portfolios and Dividends)
+- **Tax/FIFO lot accounting intentionally skipped** per user request
+  ("faire l'impasse sur les impôts"). avgCost is weighted-average only.
+
+### Phase 2 (dividends + diversification)
 - `SymbolProfile` + `DividendEvent` models (`prisma/schema.prisma`)
 - `src/lib/fundamentals.ts` — fetch + cache company profile + dividend
   history via `quoteSummary` / `historical`; retry/backoff on 429; country
@@ -69,8 +89,8 @@ sandbox is rate-limited by Yahoo. In production Yahoo will work.
   correct but the code path is a bit contorted — could be cleaned up
 
 ## Roadmap (next sessions)
-- **Phase 3 — transactions**: real dividend receipt logging, CSV import
-  from Degiro / IBKR / Trade Republic, tax lots, FIFO cost-basis
+- Broker-specific CSV mappers (Degiro / IBKR / Trade Republic) on top of
+  the generic importer
 - **Phase 4 — factor analytics** (real Aladdin feel): Fama-French 3/5 factor
   regression, stress tests (2008, 2020, rate-shock), Monte Carlo VaR,
   Markowitz / risk-parity optimization with rebalancing suggestions

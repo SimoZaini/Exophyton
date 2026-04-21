@@ -1,33 +1,50 @@
 import { requireUser } from "@/lib/session";
 import { aggregateDividendSummaryForUser } from "@/lib/dividends";
+import { dividendsReceivedBetween } from "@/lib/transactions";
 import { Topbar } from "@/components/Topbar";
 import { DividendChart } from "@/components/DividendChart";
+import { ReceiveDividendButton } from "@/components/ReceiveDividendButton";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
-import { CalendarDays, Coins, PiggyBank, Repeat } from "lucide-react";
+import { CalendarDays, CircleCheck, Coins, PiggyBank, Repeat } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function DividendsPage() {
   const user = (await requireUser())!;
-  const summary = await aggregateDividendSummaryForUser(user.id);
+  const now = new Date();
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const [summary, receivedYtd] = await Promise.all([
+    aggregateDividendSummaryForUser(user.id),
+    dividendsReceivedBetween(user.id, yearStart, now),
+  ]);
 
   const dividendPayers = summary.positions
     .filter((p) => p.dividendRate > 0)
     .sort((a, b) => b.forwardAnnualIncome - a.forwardAnnualIncome);
 
   const avgMonthly = summary.projectedMonthly.reduce((a, b) => a + b.amount, 0) / 12;
+  const ytdProgress = summary.forwardAnnualIncome > 0
+    ? receivedYtd / summary.forwardAnnualIncome
+    : 0;
 
   return (
     <>
       <Topbar title="Dividends" subtitle="Forward income projection & calendar" />
       <main className="flex-1 overflow-auto">
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="kpi">
               <span className="kpi-label"><Coins className="inline h-3 w-3 mr-1" />Forward annual income</span>
               <span className="kpi-value text-up">{formatCurrency(summary.forwardAnnualIncome)}</span>
               <span className="text-sm text-fg-muted">{formatCurrency(avgMonthly)} / month avg.</span>
+            </div>
+            <div className="kpi">
+              <span className="kpi-label"><CircleCheck className="inline h-3 w-3 mr-1" />Received YTD</span>
+              <span className="kpi-value text-up">{formatCurrency(receivedYtd)}</span>
+              <span className="text-sm text-fg-muted">
+                {formatPercent(ytdProgress, 1)} of forward year
+              </span>
             </div>
             <div className="kpi">
               <span className="kpi-label"><PiggyBank className="inline h-3 w-3 mr-1" />Portfolio yield</span>
@@ -42,7 +59,7 @@ export default async function DividendsPage() {
             <div className="kpi">
               <span className="kpi-label"><CalendarDays className="inline h-3 w-3 mr-1" />Payers</span>
               <span className="kpi-value">{dividendPayers.length}</span>
-              <span className="text-sm text-fg-muted">out of {summary.positions.length} holdings</span>
+              <span className="text-sm text-fg-muted">of {summary.positions.length} holdings</span>
             </div>
           </div>
 
@@ -73,12 +90,13 @@ export default async function DividendsPage() {
                       <th className="th text-right">YoC</th>
                       <th className="th text-right">Freq.</th>
                       <th className="th text-right">Annual income</th>
+                      <th className="th w-16" />
                     </tr>
                   </thead>
                   <tbody>
                     {dividendPayers.length === 0 && (
                       <tr>
-                        <td className="td text-fg-muted" colSpan={5}>No dividend payers yet.</td>
+                        <td className="td text-fg-muted" colSpan={6}>No dividend payers yet.</td>
                       </tr>
                     )}
                     {dividendPayers.map((p) => (
@@ -94,6 +112,12 @@ export default async function DividendsPage() {
                         <td className="td text-right text-fg-muted">{freqLabel(p.payoutFrequency)}</td>
                         <td className="td text-right tabular-nums font-medium text-up">
                           {formatCurrency(p.forwardAnnualIncome)}
+                        </td>
+                        <td className="td text-right">
+                          <ReceiveDividendButton
+                            symbol={p.symbol}
+                            suggestedAmount={p.forwardAnnualIncome / Math.max(p.payoutFrequency, 1)}
+                          />
                         </td>
                       </tr>
                     ))}

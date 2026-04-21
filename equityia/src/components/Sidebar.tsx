@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Activity, BarChart3, Briefcase, Coins, Globe2, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { Activity, ArrowLeftRight, BarChart3, Briefcase, Coins, Globe2, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/portfolios", label: "Portfolios", icon: Briefcase },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/dividends", label: "Dividends", icon: Coins },
   { href: "/diversification", label: "Diversification", icon: Globe2 },
   { href: "/analytics", label: "Risk & Analytics", icon: BarChart3 },
