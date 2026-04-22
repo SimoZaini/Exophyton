@@ -90,21 +90,70 @@ export async function getHistorical(
 }
 
 export async function cachedHistorical(symbol: string, period: "1mo" | "3mo" | "6mo" | "1y" | "2y" | "5y" = "1y") {
+  const sym = symbol.toUpperCase();
   const data = await getHistorical(symbol, period);
   if (data.length > 0) {
     await Promise.all(
       data.map((p) =>
         prisma.priceSnapshot
           .upsert({
-            where: { symbol_date: { symbol: symbol.toUpperCase(), date: p.date } },
+            where: { symbol_date: { symbol: sym, date: p.date } },
             update: { close: p.close },
-            create: { symbol: symbol.toUpperCase(), date: p.date, close: p.close },
+            create: { symbol: sym, date: p.date, close: p.close },
           })
           .catch(() => null)
       )
     );
+    return data;
   }
-  return data;
+  // Fallback: if the live fetch failed (e.g. rate-limited sandbox), serve
+  // whatever we already have cached in PriceSnapshot for this period.
+  const daysMap = { "1mo": 31, "3mo": 93, "6mo": 186, "1y": 370, "2y": 740, "5y": 1830 };
+  const since = new Date();
+  since.setDate(since.getDate() - daysMap[period]);
+  const cached = await prisma.priceSnapshot.findMany({
+    where: { symbol: sym, date: { gte: since } },
+    orderBy: { date: "asc" },
+  });
+  return cached.map((c) => ({ date: c.date, close: c.close }));
+}
+
+// Fetch historical bars for a specific [from, to] window. Tries yahoo first,
+// falls back to whatever is cached in PriceSnapshot for that window.
+export async function historicalBetween(
+  symbol: string,
+  from: Date,
+  to: Date
+): Promise<HistoricalPoint[]> {
+  const sym = symbol.toUpperCase();
+  try {
+    const rows = await yahooFinance.chart(sym, { period1: from, period2: to, interval: "1d" });
+    const quotes = rows?.quotes ?? [];
+    const live = quotes
+      .filter((r) => r.close != null && r.date)
+      .map((r) => ({ date: new Date(r.date), close: r.close as number }));
+    if (live.length > 0) {
+      await Promise.all(
+        live.map((p) =>
+          prisma.priceSnapshot
+            .upsert({
+              where: { symbol_date: { symbol: sym, date: p.date } },
+              update: { close: p.close },
+              create: { symbol: sym, date: p.date, close: p.close },
+            })
+            .catch(() => null)
+        )
+      );
+      return live;
+    }
+  } catch {
+    // fall through to DB cache
+  }
+  const cached = await prisma.priceSnapshot.findMany({
+    where: { symbol: sym, date: { gte: from, lte: to } },
+    orderBy: { date: "asc" },
+  });
+  return cached.map((c) => ({ date: c.date, close: c.close }));
 }
 
 type SearchQuote = {

@@ -168,3 +168,33 @@ export function computeRiskSummary(series: Series, benchmarkReturns?: number[]):
     beta: benchmarkReturns ? beta(rets, benchmarkReturns) : undefined,
   };
 }
+
+// Build a (dates × symbols) matrix of daily returns, aligned on dates present
+// in every symbol's series. Used by Monte Carlo VaR and the optimizer.
+export function alignedReturnsMatrix(
+  symbols: string[],
+  priceSeries: Record<string, { date: Date; close: number }[]>
+): { dates: string[]; matrix: number[][] } {
+  const perSymbolReturns: Record<string, Map<string, number>> = {};
+  for (const sym of symbols) {
+    const arr = priceSeries[sym] ?? [];
+    const m = new Map<string, number>();
+    for (let i = 1; i < arr.length; i++) {
+      const prev = arr[i - 1].close;
+      const cur = arr[i].close;
+      if (prev <= 0) continue;
+      m.set(arr[i].date.toISOString().slice(0, 10), cur / prev - 1);
+    }
+    perSymbolReturns[sym] = m;
+  }
+  if (symbols.length === 0) return { dates: [], matrix: [] };
+  const first = perSymbolReturns[symbols[0]];
+  const common = [...first.keys()]
+    .filter((d) => symbols.every((s) => perSymbolReturns[s].has(d)))
+    .sort();
+  const matrix: number[][] = [];
+  for (const d of common) {
+    matrix.push(symbols.map((s) => perSymbolReturns[s].get(d) ?? 0));
+  }
+  return { dates: common, matrix };
+}

@@ -27,7 +27,40 @@ Auth, portfolios CRUD, positions CRUD with ticker search, live quotes,
 dashboard, perf chart vs SPY, risk metrics page (Sharpe/Sortino/VaR/CVaR/
 maxDD/β), market watchlist, seed `demo@equityia.app` / `demo1234`.
 
-### Phase 3 (current commit — transactions + CSV import + dividend receipts)
+### Phase 4 (current commit — Aladdin-style analytics)
+- `src/lib/linalg.ts` — tiny pure-TS linear algebra: transpose, multiply,
+  inverse (Gauss-Jordan), Cholesky, covariance matrix, OLS with t-stats /
+  R² / adj R² / residual std, MVN sampling, percentile
+- `src/lib/factors.ts` — Fama-French 3-factor model built from liquid ETF
+  proxies (MKT = SPY−rf, SMB = IWM−SPY, HML = IWD−IWF; optional QMJ). No
+  dependency on Kenneth French's data library — reuses the yahoo pipeline.
+  `runFactorRegression()` returns alpha (daily + annualized), β_MKT, β_SMB,
+  β_HML, t-stats, R², idio vol.
+- `src/lib/stress.ts` — historical stress tests: GFC 2008 (Oct '07→Mar '09),
+  COVID crash (Feb→Mar 2020), 2022 rate shock (Jan→Oct '22), Dot-com bust
+  (2000→2002). Missing ticker history proxied by SPY/AGG/GLD/EEM by asset
+  class. Returns per-scenario portfolio return + contributors.
+- `src/lib/montecarlo.ts` — MC VaR: Cholesky of daily covariance matrix,
+  MVN sampling, compound across horizon (default 21 days), 10k sims,
+  histogram + VaR95/99 + CVaR95/99 + best/worst 1%.
+- `src/lib/optimizer.ts` — Markowitz long-only: projected-gradient descent
+  with simplex projection (Duchi 2008). Solves min-variance and max-Sharpe
+  (rf=4%). Returns weights, expected return/vol/Sharpe, and suggested
+  trades in $ (Δweight × portfolioValue) vs current weights.
+- `src/lib/analytics.ts` — added `alignedReturnsMatrix()` helper (dates ×
+  symbols matrix from per-symbol price series).
+- `src/lib/market.ts` — `cachedHistorical` now falls back to `PriceSnapshot`
+  when yahoo fails (useful in rate-limited sandboxes + for historical stress
+  windows that predate any live session). Added `historicalBetween(symbol,
+  from, to)` for arbitrary date windows (needed by stress tests).
+- `/analytics` page revamped: 4 sections (factor exposures table, stress
+  chart with 4 scenarios, MC VaR histogram + stats, optimizer comparison
+  table). All sections have graceful empty-state fallbacks. Original
+  all-portfolios risk table kept at the bottom.
+- `src/components/StressChart.tsx` + `VaRHistogram.tsx` — Recharts client
+  components.
+
+### Phase 3 (transactions + CSV import + dividend receipts)
 - `src/lib/transactions.ts` — `applyTransaction()` (BUY/SELL update Position
   qty + weighted avgCost), `revertTransaction()`, `parseTransactionsCsv()`
   (simple header-based CSV: date,symbol,type,quantity,price,fees,currency,note),
@@ -91,11 +124,14 @@ sandbox is rate-limited by Yahoo. In production Yahoo will work.
 ## Roadmap (next sessions)
 - Broker-specific CSV mappers (Degiro / IBKR / Trade Republic) on top of
   the generic importer
-- **Phase 4 — factor analytics** (real Aladdin feel): Fama-French 3/5 factor
-  regression, stress tests (2008, 2020, rate-shock), Monte Carlo VaR,
-  Markowitz / risk-parity optimization with rebalancing suggestions
 - **Phase 5 — multi-currency FX**, cash positions, benchmarks selector,
   portfolio compare
+- Factor-model extensions: 5-factor (profitability + investment), rolling
+  betas chart, risk decomposition (systematic vs idiosyncratic per holding)
+- Optimizer extensions: efficient frontier curve, custom constraints
+  (min/max per holding, sector caps), risk-parity, Black-Litterman
+- Seed synthetic daily price history for all demo tickers so the
+  /analytics page populates fully in sandboxed environments
 - Mobile responsive polish (sidebar is hidden < md but no mobile nav yet)
 - Swap SQLite → Postgres for production deploy
 
