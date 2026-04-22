@@ -16,7 +16,10 @@ want institutional-grade risk + diversification + income dashboards.
 ## Stack & key libs
 - Next.js 14 App Router, React 18, Tailwind (dark theme, custom tokens in
   `tailwind.config.ts` and `globals.css`)
-- Prisma 5 + SQLite (`prisma/dev.db`, gitignored)
+- Prisma 5 + **Postgres** (Vercel Postgres / Neon). Uses dual URLs:
+  `POSTGRES_PRISMA_URL` (pooled, runtime) + `POSTGRES_URL_NON_POOLING`
+  (direct, migrations). No local SQLite anymore — point env at Neon / a
+  local `docker run postgres:16` for dev.
 - NextAuth credentials provider (see `src/lib/auth.ts`)
 - `yahoo-finance2@2.13.3` — pinned; **2.14+ strips modules we need**
 - Recharts for charts; `lucide-react` icons; `clsx` + `tailwind-merge`
@@ -138,10 +141,15 @@ sandbox is rate-limited by Yahoo. In production Yahoo will work.
 ## Local dev quickstart
 ```bash
 cd equityia
-npm install
-npm run db:push
-npm run db:seed   # creates demo user + backfills profiles
-npm run dev       # http://localhost:3000  — demo@equityia.app / demo1234
+cp .env.example .env         # fill POSTGRES_* + NEXTAUTH_SECRET + SEED_TOKEN
+npm install                  # runs `prisma generate` via postinstall
+npm run db:push              # sync schema to Postgres
+npm run db:seed              # demo user + 11 positions + 13 buys + 10 divs
+npm run dev                  # http://localhost:3000 — demo@equityia.app / demo1234
 ```
 
-Login and visit `/dashboard`, `/dividends`, `/diversification`.
+Login and visit `/dashboard`, `/dividends`, `/diversification`, `/transactions`, `/analytics`.
+
+## Deployment
+See `DEPLOY.md` for step-by-step Vercel deployment (one-click Postgres via
+Neon, env vars, seed via `/api/admin/seed`).
